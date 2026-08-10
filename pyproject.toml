@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "continual-learning-lab"
+version = "0.1.0"
+description = "Minimal continual-learning experiments in PyTorch"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "mlflow>=3.0,<4",
+    "numpy>=1.26,<3",
+    "PyYAML>=6.0,<7",
+    "torch>=2.6,<3",
+    "torchvision>=0.21,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+]
+
+[project.scripts]
+cl-inspect = "continual_learning_lab.inspect_run:main"
+cl-run = "continual_learning_lab.run:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+# Keep temporary test files inside the repository. This avoids collisions with
+# stale or differently-owned directories in the Windows user temp folder.
+addopts = "-ra --basetemp=.pytest_tmp"
+testpaths = ["tests"]

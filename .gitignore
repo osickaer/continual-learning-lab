@@ -49,6 +49,7 @@ coverage.xml
 *.py.cover
 .hypothesis/
 .pytest_cache/
+.pytest_tmp/
 cover/
 
 # Translations
@@ -216,3 +217,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Continual-learning experiment data and local outputs
+data/
+outputs/
+inspections/
+mlflow.db
+mlflow.db-*
+mlartifacts/
+learning/
