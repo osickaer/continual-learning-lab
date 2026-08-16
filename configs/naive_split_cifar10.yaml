@@ -17,12 +17,13 @@ data:
   pin_memory: true
   max_train_samples_per_class: null
   max_eval_samples_per_class: null
+  protocol: sequential
   task_classes:
-    - [0, 1]  # airplane, automobile
-    - [2, 3]  # bird, cat
-    - [4, 5]  # deer, dog
-    - [6, 7]  # frog, horse
-    - [8, 9]  # ship, truck
+    - [0, 1] # airplane, automobile
+    - [2, 3] # bird, cat
+    - [4, 5] # deer, dog
+    - [6, 7] # frog, horse
+    - [8, 9] # ship, truck
 
 model:
   channels: [32, 64]

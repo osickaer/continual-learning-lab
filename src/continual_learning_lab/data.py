@@ -55,6 +55,13 @@ class TaskLoaders:
     test: DataLoader[Any]
 
 
+@dataclass(frozen=True)
+class JointLoaders:
+    train: DataLoader[Any]
+    overall_test: DataLoader[Any]
+    pair_tests: tuple[DataLoader[Any], ...]
+
+
 def build_cifar10_transforms() -> tuple[transforms.Compose, transforms.Compose]:
     """Build augmented training transforms and stable evaluation transforms."""
     train_transform = transforms.Compose(
@@ -74,7 +81,9 @@ def build_cifar10_transforms() -> tuple[transforms.Compose, transforms.Compose]:
     return train_transform, test_transform
 
 
-def build_split_cifar10(config: DataConfig, seed: int, use_pin_memory: bool) -> list[TaskLoaders]:
+def _build_cifar10_datasets(
+    config: DataConfig,
+) -> tuple[datasets.CIFAR10, datasets.CIFAR10]:
     train_transform, test_transform = build_cifar10_transforms()
     train_dataset = datasets.CIFAR10(
         root=config.root,
@@ -88,6 +97,11 @@ def build_split_cifar10(config: DataConfig, seed: int, use_pin_memory: bool) -> 
         transform=test_transform,
         download=config.download,
     )
+    return train_dataset, test_dataset
+
+
+def build_split_cifar10(config: DataConfig, seed: int, use_pin_memory: bool) -> list[TaskLoaders]:
+    train_dataset, test_dataset = _build_cifar10_datasets(config)
 
     tasks: list[TaskLoaders] = []
     for task_id, classes in enumerate(config.task_classes):

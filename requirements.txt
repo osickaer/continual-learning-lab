@@ -1,16 +1,4 @@
-# Direct dependencies from the environment used to verify this repository.
-# Install from the repository root with: python -m pip install -r requirements.txt
-# The local machine uses NVIDIA CUDA 13.0 PyTorch wheels. The extra index is
-# needed because CUDA-tagged wheels are hosted by PyTorch rather than PyPI.
---extra-index-url https://download.pytorch.org/whl/cu130
-
-mlflow==3.15.1
-numpy==2.4.4
-PyYAML==6.0.3
-pytest==8.4.2
-torch==2.13.0+cu130
-torchvision==0.28.0+cu130
-
-# Install this repository itself in editable mode. The package metadata in
-# pyproject.toml remains the canonical declaration of supported version ranges.
--e .
+# Cross-platform development install. pyproject.toml is the canonical source
+# for supported dependency ranges and lets pip select PyTorch wheels for the
+# current operating system and hardware.
+-e .[dev]

@@ -1,0 +1,12 @@
+# Exact environment snapshot used to verify Experiment 000 on the original
+# Windows/NVIDIA lab machine. Do not use this file on macOS.
+--extra-index-url https://download.pytorch.org/whl/cu130
+
+mlflow==3.15.1
+numpy==2.4.4
+PyYAML==6.0.3
+pytest==8.4.2
+torch==2.13.0+cu130
+torchvision==0.28.0+cu130
+
+-e .

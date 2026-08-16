@@ -30,6 +30,7 @@ class DataConfig:
     max_train_samples_per_class: int | None
     max_eval_samples_per_class: int | None
     task_classes: tuple[tuple[int, ...], ...]
+    protocol: str
 
 
 @dataclass(frozen=True)
@@ -124,6 +125,8 @@ def validate_config(config: Config) -> None:
         raise ValueError("experiment.device must be auto, cpu, cuda, or mps")
     if not config.data.task_classes:
         raise ValueError("data.task_classes cannot be empty")
+    if config.data.protocol not in {"sequential", "joint"}:
+        raise ValueError("data.protocol must be sequential or joint")
 
     flat_classes = [class_id for task in config.data.task_classes for class_id in task]
     expected_classes = list(range(config.model.num_classes))
@@ -158,4 +161,3 @@ def validate_config(config: Config) -> None:
     ):
         if value is not None and value <= 0:
             raise ValueError(f"data.{name} must be positive or null")
-
