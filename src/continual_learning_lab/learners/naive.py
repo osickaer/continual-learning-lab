@@ -35,40 +35,39 @@ class NaiveSequentialLearner:
             )
         raise ValueError(f"Unsupported optimizer: {self.config.optimizer}")
 
-    def train_task(self, task_id: int, loader: DataLoader) -> list[EpochResult]:
+    def train_epoch(self, task_id: int, epoch: int, loader: DataLoader) -> EpochResult:
         # task_id is intentionally unused: the naive model is never told which task it sees.
         del task_id
-        results: list[EpochResult] = []
-        for epoch in range(self.config.epochs_per_task):
-            self.model.train()
-            total_loss = 0.0
-            total_correct = 0
-            total_examples = 0
+        self.model.train()
+        total_loss = 0.0
+        total_correct = 0
+        total_examples = 0
 
-            for inputs, targets in loader:
-                inputs = inputs.to(self.device, non_blocking=True)
-                targets = targets.to(self.device, non_blocking=True)
+        for inputs, targets in loader:
+            inputs = inputs.to(self.device, non_blocking=True)
+            targets = targets.to(self.device, non_blocking=True)
 
-                self.optimizer.zero_grad(set_to_none=True)
-                logits = self.model(inputs)
-                loss = self.criterion(logits, targets)
-                loss.backward()
-                self.optimizer.step()
+            # PyTorch accumulates gradients by default, so clear values left by
+            # the preceding batch before building this batch's computation graph.
+            self.optimizer.zero_grad(set_to_none=True)
+            logits = self.model(inputs)
+            loss = self.criterion(logits, targets)
+            # backward() writes gradients into each model parameter's .grad;
+            # step() reads those gradients and updates the same parameters.
+            loss.backward()
+            self.optimizer.step()
 
-                batch_size = targets.size(0)
-                total_loss += loss.item() * batch_size
-                total_correct += (logits.argmax(dim=1) == targets).sum().item()
-                total_examples += batch_size
+            batch_size = targets.size(0)
+            total_loss += loss.item() * batch_size
+            total_correct += (logits.argmax(dim=1) == targets).sum().item()
+            total_examples += batch_size
 
-            if total_examples == 0:
-                raise ValueError("Cannot train on an empty dataset")
-            results.append(
-                EpochResult(
-                    epoch=epoch,
-                    loss=total_loss / total_examples,
-                    accuracy=total_correct / total_examples,
-                    examples=total_examples,
-                )
-            )
-        return results
+        if total_examples == 0:
+            raise ValueError("Cannot train on an empty dataset")
 
+        return EpochResult(
+            epoch=epoch,
+            loss=total_loss / total_examples,
+            accuracy=total_correct / total_examples,
+            examples=total_examples,
+        )

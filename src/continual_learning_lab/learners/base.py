@@ -20,5 +20,9 @@ class ContinualLearner(Protocol):
 
     model: nn.Module
 
-    def train_task(self, task_id: int, loader: DataLoader) -> list[EpochResult]: ...
-
+    def train_epoch(
+        self,
+        task_id: int,
+        epoch: int,
+        loader: DataLoader,
+    ) -> EpochResult: ...

@@ -1,0 +1,76 @@
+# Experiment 001 is a joint-training oracle: it asks what this exact CNN can
+# learn when all ten training classes remain available. It is a reference
+# condition, not a continual-learning solution.
+experiment:
+  # MLflow groups runs under this experiment name; run_name identifies this
+  # specific seed/configuration within the experiment.
+  name: experiment-001-joint-cifar10-oracle
+  run_name: exp001-joint-seed-42
+  # Seeds model initialization, data shuffling, and other project RNGs.
+  seed: 42
+  # Prefer CUDA, then Apple MPS, then CPU. This resolves to MPS on the Mac.
+  device: auto
+  # Local result copies, MLflow database, and MLflow artifact locations.
+  output_dir: outputs
+  tracking_uri: sqlite:///mlflow.db
+  artifact_dir: mlartifacts
+  # Ask PyTorch to reject known nondeterministic operations instead of silently
+  # weakening reproducibility.
+  deterministic: true
+
+data:
+  # CIFAR-10 is read from this repository-relative directory. download=true is
+  # safe after download: torchvision verifies the existing files.
+  root: data
+  download: true
+  # Training batches define one stochastic gradient estimate. Evaluation
+  # batches only affect throughput because evaluation never updates weights.
+  train_batch_size: 128
+  eval_batch_size: 256
+  # Worker processes prepare data in parallel. Pinned memory is requested here,
+  # but the runner only enables it when the resolved device is CUDA, not MPS.
+  num_workers: 2
+  pin_memory: true
+  # null uses all 5,000 train and 1,000 test images per CIFAR-10 class. Positive
+  # limits are useful for smoke tests, not for the official comparison.
+  max_train_samples_per_class: null
+  max_eval_samples_per_class: null
+  # This is the experiment's one conceptual change. "joint" presents examples
+  # from all ten classes in one shuffled loader throughout training.
+  protocol: joint
+  # Joint training does not train these pairs sequentially. We retain the
+  # canonical pairs as five diagnostic test views so overall accuracy cannot
+  # hide a particularly weak part of the class space. Labels stay global: the
+  # model always chooses among all ten output logits, even on a pair test view.
+  task_classes:
+    - [0, 1] # airplane, automobile
+    - [2, 3] # bird, cat
+    - [4, 5] # deer, dog
+    - [6, 7] # frog, horse
+    - [8, 9] # ship, truck
+
+model:
+  # Two convolutional feature widths, one dense hidden width, the fraction of
+  # hidden activations dropped during training, and the shared output size.
+  # These values are identical to Experiment 000 to hold model capacity fixed.
+  channels: [32, 64]
+  hidden_dim: 256
+  dropout: 0.2
+  num_classes: 10
+
+training:
+  # "naive" means ordinary supervised optimization with no replay,
+  # regularization-based CL method, or stored old model. Targets are still used
+  # to calculate cross-entropy loss; protocol and method describe different
+  # things: data availability versus the parameter-update algorithm.
+  method: naive
+  # There is one joint training stage, so this means 15 passes over all 50,000
+  # training images: 750,000 example presentations, matching Experiment 000.
+  epochs_per_task: 15
+  # SGD updates weights using the current gradients. learning_rate controls
+  # update scale, momentum carries an update direction across batches, and
+  # weight_decay discourages large weights.
+  optimizer: sgd
+  learning_rate: 0.01
+  momentum: 0.9
+  weight_decay: 0.0005

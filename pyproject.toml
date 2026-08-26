@@ -20,6 +20,11 @@ dependencies = [
 dev = [
     "pytest>=8,<9",
 ]
+notebook = [
+    "ipykernel>=6,<8",
+    "jupyterlab>=4,<5",
+    "matplotlib>=3.9,<4",
+]
 
 [project.scripts]
 cl-inspect = "continual_learning_lab.inspect_run:main"

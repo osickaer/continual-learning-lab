@@ -1,4 +1,4 @@
 # Cross-platform development install. pyproject.toml is the canonical source
 # for supported dependency ranges and lets pip select PyTorch wheels for the
 # current operating system and hardware.
--e .[dev]
+-e .[dev,notebook]

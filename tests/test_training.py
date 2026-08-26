@@ -23,8 +23,10 @@ def test_naive_learner_updates_parameters_and_learns_tiny_dataset() -> None:
     )
 
     learner = NaiveSequentialLearner(model, config, torch.device("cpu"))
-    results = learner.train_task(task_id=0, loader=loader)
+    results = [
+        learner.train_epoch(task_id=0, epoch=epoch, loader=loader)
+        for epoch in range(config.epochs_per_task)
+    ]
 
     assert not torch.equal(initial, model.weight)
     assert results[-1].accuracy >= 0.95
-

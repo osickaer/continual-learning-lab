@@ -12,6 +12,19 @@ import torchvision
 from continual_learning_lab.config import Config
 
 
+def _experiment_description(config: Config) -> str:
+    if config.data.protocol == "joint":
+        return (
+            "Joint-training CIFAR-10 capacity oracle. All ten classes remain "
+            "available throughout training; this is a privileged control, not a "
+            "continual-learning solution."
+        )
+    return (
+        "Naive sequential Split CIFAR-10 baseline. Five class pairs arrive in "
+        "sequence and the shared ten-class model retains no old data or model state."
+    )
+
+
 def normalize_tracking_uri(uri: str) -> str:
     """Make a relative SQLite URI stable regardless of MLflow internals."""
     prefix = "sqlite:///"
@@ -50,6 +63,11 @@ def start_run(config: Config) -> Iterator[mlflow.ActiveRun]:
         )
     else:
         experiment_id = experiment.experiment_id
+    client.set_experiment_tag(
+        experiment_id,
+        "mlflow.note.content",
+        _experiment_description(config),
+    )
 
     with mlflow.start_run(
         experiment_id=experiment_id,
@@ -58,9 +76,15 @@ def start_run(config: Config) -> Iterator[mlflow.ActiveRun]:
         mlflow.log_params(flatten_mapping(config.to_dict()))
         mlflow.set_tags(
             {
-                "protocol": "class-incremental",
-                "dataset": "Split CIFAR-10",
+                "protocol": config.data.protocol,
+                "dataset": "CIFAR-10",
                 "method": config.training.method,
+                "run.role": (
+                    "joint-training capacity oracle"
+                    if config.data.protocol == "joint"
+                    else "continual-learning baseline"
+                ),
+                "evaluation": "shared-head ten-class classification",
                 "python.version": platform.python_version(),
                 "torch.version": torch.__version__,
                 "torchvision.version": torchvision.__version__,
@@ -68,4 +92,3 @@ def start_run(config: Config) -> Iterator[mlflow.ActiveRun]:
             }
         )
         yield active_run
-

@@ -146,3 +146,75 @@ def build_split_cifar10(config: DataConfig, seed: int, use_pin_memory: bool) -> 
             )
         )
     return tasks
+
+
+def build_joint_cifar10(
+    config: DataConfig,
+    seed: int,
+    use_pin_memory: bool,
+) -> JointLoaders:
+    train_dataset, test_dataset = _build_cifar10_datasets(config)
+
+    # Materialize this as a tuple because ClassSubset needs to iterate over the
+    # class IDs more than once. A generator would be exhausted after first use.
+    all_classes = tuple(class_id for task in config.task_classes for class_id in task)
+
+    train_subset = ClassSubset(
+        train_dataset,
+        train_dataset.targets,
+        all_classes,
+        config.max_train_samples_per_class,
+    )
+    test_subset = ClassSubset(
+        test_dataset,
+        test_dataset.targets,
+        all_classes,
+        config.max_eval_samples_per_class,
+    )
+
+    common_loader_args = {
+        "num_workers": config.num_workers,
+        "pin_memory": config.pin_memory and use_pin_memory,
+        "worker_init_fn": seed_worker,
+        # Recreate workers for each iteration instead of keeping a worker pool
+        # alive for every overall/pair loader throughout the run.
+        "persistent_workers": False,
+    }
+
+    pair_test_data_loaders: list[DataLoader] = []
+    for task_id, classes in enumerate(config.task_classes):
+        pair_test_subset = ClassSubset(
+            test_dataset,
+            test_dataset.targets,
+            classes,
+            config.max_eval_samples_per_class,
+        )
+        pair_test_data_loaders.append(
+            DataLoader(
+                pair_test_subset,
+                batch_size=config.eval_batch_size,
+                shuffle=False,
+                generator=make_generator(seed + 10_001 + task_id),
+                **common_loader_args,
+            )
+        )
+
+    loaders = JointLoaders(
+        train=DataLoader(
+            train_subset,
+            batch_size=config.train_batch_size,
+            shuffle=True,
+            generator=make_generator(seed),
+            **common_loader_args,
+        ),
+        overall_test=DataLoader(
+            test_subset,
+            batch_size=config.eval_batch_size,
+            shuffle=False,
+            generator=make_generator(seed + 10_000),
+            **common_loader_args,
+        ),
+        pair_tests=tuple(pair_test_data_loaders),
+    )
+
+    return loaders
