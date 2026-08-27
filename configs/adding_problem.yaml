@@ -1,0 +1,55 @@
+# Experiment 003 replaces binary recall with the classic Adding Problem. Each
+# sequence contains two marked values whose sum must be predicted at the end.
+experiment:
+  kind: adding_problem
+  name: experiment-003-adding-problem
+  run_name: exp003-adding
+  seeds: [42, 43, 44]
+  device: auto
+  output_dir: outputs
+  tracking_uri: sqlite:///mlflow.db
+  artifact_dir: mlartifacts
+  deterministic: true
+
+data:
+  train_lengths: [20, 40, 80]
+  evaluation_lengths: [20, 40, 80, 160, 320]
+  train_examples_per_length: 4096
+  validation_examples_per_length: 512
+  test_examples_per_length: 1024
+  batch_size: 128
+  num_workers: 0
+  pin_memory: true
+  value_low: 0.0
+  value_high: 1.0
+  # One marked position is sampled from each half of every sequence.
+  marker_policy: split_halves
+
+model:
+  input_size: 2
+  hidden_size: 96
+  output_size: 1
+  homogeneous_alphas: [0.5, 0.1, 0.01]
+  heterogeneous_alphas: [0.5, 0.1, 0.01]
+  heterogeneous_group_sizes: [32, 32, 32]
+  include_gru: true
+
+training:
+  epochs: 30
+  optimizer: adamw
+  learning_rate: 0.001
+  weight_decay: 0.0
+  gradient_clip_norm: 1.0
+
+evaluation:
+  # Homogeneous alpha selection is restricted to trained validation lengths.
+  selection_lengths: [40, 80]
+  # These lengths are never used for optimization or alpha selection.
+  long_lengths: [160, 320]
+  short_lengths: [20, 40]
+  min_long_relative_improvement: 0.20
+  min_paired_seed_wins: 2
+  max_short_mse_penalty: 0.01
+  inspection_seed: 42
+  inspection_length: 320
+  inspection_examples: 2

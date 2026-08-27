@@ -1,0 +1,59 @@
+# Experiment 002 tests a learner-originated recurrent-memory hypothesis. One
+# model learns all five delays, and every architecture receives paired data and
+# batch order for a given seed.
+experiment:
+  kind: delayed_recall
+  name: experiment-002-heterogeneous-leaky-delayed-recall
+  run_name: exp002-delayed-recall
+  seeds: [42, 43, 44]
+  device: auto
+  output_dir: outputs
+  tracking_uri: sqlite:///mlflow.db
+  artifact_dir: mlartifacts
+  deterministic: true
+
+data:
+  delays: [5, 10, 20, 40, 80]
+  # These preserve the timing and channel semantics of the completed first run.
+  timing_protocol: fixed_final_cue
+  distractor_mode: separate_channel
+  train_examples_per_delay: 1024
+  validation_examples_per_delay: 256
+  test_examples_per_delay: 512
+  batch_size: 128
+  num_workers: 0
+  pin_memory: true
+  distractor_low: -1.0
+  distractor_high: 1.0
+
+model:
+  # Inputs are [value_signal, distractor, recall_cue]. The output classes mean
+  # recalled -1 and recalled +1 respectively.
+  input_size: 3
+  hidden_size: 96
+  num_classes: 2
+  # Validation chooses one of these as the official homogeneous comparison.
+  homogeneous_alphas: [0.5, 0.1, 0.01]
+  heterogeneous_alphas: [0.5, 0.1, 0.01]
+  heterogeneous_group_sizes: [32, 32, 32]
+  # GRU is reported for context but is not part of the hypothesis verdict.
+  include_gru: true
+
+training:
+  epochs: 30
+  optimizer: adamw
+  learning_rate: 0.001
+  weight_decay: 0.0
+  gradient_clip_norm: 1.0
+
+evaluation:
+  # Homogeneous alpha selection uses validation results only.
+  selection_delays: [40, 80]
+  long_delays: [40, 80]
+  short_delays: [5, 10]
+  min_long_advantage: 0.05
+  min_paired_seed_wins: 2
+  max_short_penalty: 0.03
+  inspection_seed: 42
+  inspection_delay: 80
+  inspection_examples_per_class: 1

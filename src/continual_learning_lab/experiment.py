@@ -6,7 +6,12 @@ from pathlib import Path
 import mlflow
 import torch
 
-from continual_learning_lab.config import Config
+from continual_learning_lab.config import (
+    AddingProblemConfig,
+    Config,
+    DelayedRecallConfig,
+    LoadedConfig,
+)
 from continual_learning_lab.data import (
     JointLoaders,
     TaskLoaders,
@@ -291,7 +296,27 @@ def _build_run_report(config: Config, summary: dict[str, object]) -> str:
     )
 
 
-def run_experiment(config: Config, config_path: str | Path) -> Path:
+def run_experiment(config: LoadedConfig, config_path: str | Path) -> Path:
+    if isinstance(config, AddingProblemConfig):
+        from continual_learning_lab.adding_problem_experiment import (
+            run_adding_problem_experiment,
+        )
+
+        device = resolve_device(config.experiment.device)
+        print(f"Using device: {device}", flush=True)
+        return run_adding_problem_experiment(config, config_path, device)
+
+    if isinstance(config, DelayedRecallConfig):
+        # Import locally so the delayed-recall runner can reuse resolve_device
+        # without creating a module-import cycle for the legacy CIFAR path.
+        from continual_learning_lab.delayed_recall_experiment import (
+            run_delayed_recall_experiment,
+        )
+
+        device = resolve_device(config.experiment.device)
+        print(f"Using device: {device}", flush=True)
+        return run_delayed_recall_experiment(config, config_path, device)
+
     seed_everything(config.experiment.seed, config.experiment.deterministic)
     device = resolve_device(config.experiment.device)
 

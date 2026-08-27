@@ -2,11 +2,20 @@ from pathlib import Path
 
 import pytest
 
-from continual_learning_lab.config import load_config
+from continual_learning_lab.config import AddingProblemConfig, DelayedRecallConfig, load_config
 
 
 CONFIG_PATH = Path(__file__).parents[1] / "configs" / "naive_split_cifar10.yaml"
 JOINT_CONFIG_PATH = Path(__file__).parents[1] / "configs" / "joint_cifar10_oracle.yaml"
+DELAYED_CONFIG_PATH = (
+    Path(__file__).parents[1] / "configs" / "heterogeneous_leaky_delayed_recall.yaml"
+)
+CORRECTED_DELAYED_CONFIG_PATH = (
+    Path(__file__).parents[1]
+    / "configs"
+    / "heterogeneous_leaky_delayed_recall_corrected.yaml"
+)
+ADDING_CONFIG_PATH = Path(__file__).parents[1] / "configs" / "adding_problem.yaml"
 
 
 def test_baseline_config_loads() -> None:
@@ -49,4 +58,51 @@ def test_unknown_data_protocol_is_rejected(tmp_path: Path) -> None:
     invalid_path.write_text(text, encoding="utf-8")
 
     with pytest.raises(ValueError, match="data.protocol must be sequential or joint"):
+        load_config(invalid_path)
+
+
+def test_delayed_recall_config_loads_full_experiment_contract() -> None:
+    config = load_config(DELAYED_CONFIG_PATH)
+
+    assert isinstance(config, DelayedRecallConfig)
+    assert config.experiment.seeds == (42, 43, 44)
+    assert config.data.delays == (5, 10, 20, 40, 80)
+    assert config.model.heterogeneous_group_sizes == (32, 32, 32)
+    assert config.evaluation.min_long_advantage == 0.05
+    assert config.data.timing_protocol == "fixed_final_cue"
+    assert config.data.distractor_mode == "separate_channel"
+
+
+def test_corrected_delayed_recall_config_loads_timing_contract() -> None:
+    config = load_config(CORRECTED_DELAYED_CONFIG_PATH)
+
+    assert isinstance(config, DelayedRecallConfig)
+    assert config.data.delays == (5, 10, 20, 40, 80, 120)
+    assert config.data.timing_protocol == "fixed_initial_value"
+    assert config.data.distractor_mode == "same_content_channel"
+    assert config.evaluation.selection_delays == (80, 120)
+    assert config.evaluation.inspection_delay == 120
+
+
+def test_adding_problem_config_separates_training_and_unseen_lengths() -> None:
+    config = load_config(ADDING_CONFIG_PATH)
+
+    assert isinstance(config, AddingProblemConfig)
+    assert config.data.train_lengths == (20, 40, 80)
+    assert config.data.evaluation_lengths == (20, 40, 80, 160, 320)
+    assert config.evaluation.long_lengths == (160, 320)
+    assert config.model.output_size == 1
+
+
+def test_delayed_recall_rejects_groups_that_do_not_fill_hidden_state(
+    tmp_path: Path,
+) -> None:
+    text = DELAYED_CONFIG_PATH.read_text(encoding="utf-8").replace(
+        "heterogeneous_group_sizes: [32, 32, 32]",
+        "heterogeneous_group_sizes: [32, 32, 31]",
+    )
+    invalid_path = tmp_path / "invalid-delayed.yaml"
+    invalid_path.write_text(text, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="sum to model.hidden_size"):
         load_config(invalid_path)

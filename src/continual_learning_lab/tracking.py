@@ -51,22 +51,33 @@ def flatten_mapping(values: dict[str, Any], prefix: str = "") -> dict[str, Any]:
     return flat
 
 
-@contextmanager
-def start_run(config: Config) -> Iterator[mlflow.ActiveRun]:
-    mlflow.set_tracking_uri(normalize_tracking_uri(config.experiment.tracking_uri))
+def get_or_create_experiment(
+    *,
+    name: str,
+    artifact_dir: str,
+    description: str,
+) -> str:
+    """Resolve one MLflow experiment for either a single run or a run suite."""
     client = mlflow.MlflowClient()
-    experiment = client.get_experiment_by_name(config.experiment.name)
+    experiment = client.get_experiment_by_name(name)
     if experiment is None:
         experiment_id = client.create_experiment(
-            config.experiment.name,
-            artifact_location=Path(config.experiment.artifact_dir).resolve().as_uri(),
+            name,
+            artifact_location=Path(artifact_dir).resolve().as_uri(),
         )
     else:
         experiment_id = experiment.experiment_id
-    client.set_experiment_tag(
-        experiment_id,
-        "mlflow.note.content",
-        _experiment_description(config),
+    client.set_experiment_tag(experiment_id, "mlflow.note.content", description)
+    return experiment_id
+
+
+@contextmanager
+def start_run(config: Config) -> Iterator[mlflow.ActiveRun]:
+    mlflow.set_tracking_uri(normalize_tracking_uri(config.experiment.tracking_uri))
+    experiment_id = get_or_create_experiment(
+        name=config.experiment.name,
+        artifact_dir=config.experiment.artifact_dir,
+        description=_experiment_description(config),
     )
 
     with mlflow.start_run(

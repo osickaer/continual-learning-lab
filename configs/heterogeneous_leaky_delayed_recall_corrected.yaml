@@ -1,0 +1,55 @@
+# Corrected Experiment 002 follow-up. Every delay now begins from the same
+# initial condition: the value arrives at t=0 and the cue follows after exactly
+# D distractor updates. Shorter examples are zero-padded only after their cue.
+experiment:
+  kind: delayed_recall
+  name: experiment-002b-corrected-delayed-recall
+  run_name: exp002b-corrected
+  seeds: [42, 43, 44]
+  device: auto
+  output_dir: outputs
+  tracking_uri: sqlite:///mlflow.db
+  artifact_dir: mlartifacts
+  deterministic: true
+
+data:
+  delays: [5, 10, 20, 40, 80, 120]
+  timing_protocol: fixed_initial_value
+  distractor_mode: same_content_channel
+  train_examples_per_delay: 1024
+  validation_examples_per_delay: 256
+  test_examples_per_delay: 512
+  batch_size: 128
+  num_workers: 0
+  pin_memory: true
+  distractor_low: -1.0
+  distractor_high: 1.0
+
+model:
+  # Inputs are [content, store_marker, recall_cue]. At t=0, content is the
+  # target value and store_marker=1. During the delay, distractors use content.
+  input_size: 3
+  hidden_size: 96
+  num_classes: 2
+  homogeneous_alphas: [0.5, 0.1, 0.01]
+  heterogeneous_alphas: [0.5, 0.1, 0.01]
+  heterogeneous_group_sizes: [32, 32, 32]
+  include_gru: true
+
+training:
+  epochs: 30
+  optimizer: adamw
+  learning_rate: 0.001
+  weight_decay: 0.0
+  gradient_clip_norm: 1.0
+
+evaluation:
+  selection_delays: [80, 120]
+  long_delays: [80, 120]
+  short_delays: [5, 10]
+  min_long_advantage: 0.05
+  min_paired_seed_wins: 2
+  max_short_penalty: 0.03
+  inspection_seed: 42
+  inspection_delay: 120
+  inspection_examples_per_class: 1
