@@ -225,3 +225,7 @@ inspections/
 mlflow.db
 mlflow.db-*
 mlartifacts/
+
+# Local personal notes and publication backups
+.private/
+learning/
