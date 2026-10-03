@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import csv
-import json
 import math
 import platform
 import statistics
@@ -25,6 +24,10 @@ from continual_learning_lab.adding_problem_data import (
     build_adding_problem_loaders,
 )
 from continual_learning_lab.config import AddingProblemConfig
+from continual_learning_lab.experiment_utils import (
+    synchronize_device as _synchronize_device,
+    write_json as _write_json,
+)
 from continual_learning_lab.model import count_trainable_parameters
 from continual_learning_lab.recurrent_models import build_recurrent_model
 from continual_learning_lab.reproducibility import make_generator, seed_everything
@@ -53,17 +56,6 @@ class AddingRunResult:
     validation: dict[int, AddingMetrics]
     test: dict[int, AddingMetrics]
     model_state_path: Path
-
-
-def _write_json(path: Path, values: object) -> None:
-    path.write_text(json.dumps(values, indent=2), encoding="utf-8")
-
-
-def _synchronize_device(device: torch.device) -> None:
-    if device.type == "cuda":
-        torch.cuda.synchronize(device)
-    elif device.type == "mps":
-        torch.mps.synchronize()
 
 
 def _setting_name(model_type: str, alpha: float | None) -> str:

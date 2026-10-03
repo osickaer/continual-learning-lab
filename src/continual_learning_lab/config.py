@@ -208,7 +208,78 @@ class AddingProblemConfig:
         return asdict(self)
 
 
-LoadedConfig = Config | DelayedRecallConfig | AddingProblemConfig
+@dataclass(frozen=True)
+class Stream51ExperimentConfig:
+    kind: str
+    name: str
+    run_name: str
+    seeds: tuple[int, ...]
+    device: str
+    output_dir: str
+    tracking_uri: str
+    artifact_dir: str
+    deterministic: bool
+
+
+@dataclass(frozen=True)
+class Stream51DataConfig:
+    root: str
+    train_metadata: str
+    test_metadata: str
+    feature_cache: str
+    orderings: tuple[str, ...]
+    order_seed: int
+    bbox_crop: bool
+    bbox_padding_ratio: float
+    feature_batch_size: int
+    num_workers: int
+    pin_memory: bool
+    max_trajectories: int | None
+
+
+@dataclass(frozen=True)
+class Stream51ModelConfig:
+    encoder_weights: str
+    feature_size: int
+    hidden_size: int
+    num_classes: int
+    tick_counts: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class Stream51TrainingConfig:
+    passes: int
+    batch_size: int
+    optimizer: str
+    learning_rate: float
+    weight_decay: float
+    gradient_clip_norm: float
+
+
+@dataclass(frozen=True)
+class Stream51EvaluationConfig:
+    window_size: int
+    eval_batch_size: int
+    min_natural_persistence_gain: float
+    min_natural_over_global_gain: float
+    max_heldout_macro_penalty: float
+    min_multitick_interaction_gain: float
+    min_paired_seed_wins: int
+
+
+@dataclass(frozen=True)
+class Stream51Config:
+    experiment: Stream51ExperimentConfig
+    data: Stream51DataConfig
+    model: Stream51ModelConfig
+    training: Stream51TrainingConfig
+    evaluation: Stream51EvaluationConfig
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+LoadedConfig = Config | DelayedRecallConfig | AddingProblemConfig | Stream51Config
 
 
 def _require_sections(raw: dict[str, Any], expected: set[str]) -> None:
@@ -241,6 +312,11 @@ def load_config(path: str | Path) -> LoadedConfig:
         return _load_delayed_recall_config(raw)
     if isinstance(experiment_raw, dict) and experiment_raw.get("kind") == "adding_problem":
         return _load_adding_problem_config(raw)
+    if (
+        isinstance(experiment_raw, dict)
+        and experiment_raw.get("kind") == "stream51_temporal_state"
+    ):
+        return _load_stream51_config(raw)
 
     _require_sections(raw, {"experiment", "data", "model", "training"})
 
@@ -389,6 +465,41 @@ def _load_adding_problem_config(raw: dict[str, Any]) -> AddingProblemConfig:
         ),
     )
     validate_adding_problem_config(config)
+    return config
+
+
+def _load_stream51_config(raw: dict[str, Any]) -> Stream51Config:
+    _require_sections(raw, {"experiment", "data", "model", "training", "evaluation"})
+    sections = tuple(
+        raw[name] for name in ("experiment", "data", "model", "training", "evaluation")
+    )
+    if not all(isinstance(section, dict) for section in sections):
+        raise ValueError("Every configuration section must be a mapping")
+
+    experiment, data, model, training, evaluation = sections
+    _check_keys("experiment", experiment, set(Stream51ExperimentConfig.__dataclass_fields__))
+    _check_keys("data", data, set(Stream51DataConfig.__dataclass_fields__))
+    _check_keys("model", model, set(Stream51ModelConfig.__dataclass_fields__))
+    _check_keys("training", training, set(Stream51TrainingConfig.__dataclass_fields__))
+    _check_keys("evaluation", evaluation, set(Stream51EvaluationConfig.__dataclass_fields__))
+
+    config = Stream51Config(
+        experiment=Stream51ExperimentConfig(
+            **{key: value for key, value in experiment.items() if key != "seeds"},
+            seeds=tuple(experiment["seeds"]),
+        ),
+        data=Stream51DataConfig(
+            **{key: value for key, value in data.items() if key != "orderings"},
+            orderings=tuple(data["orderings"]),
+        ),
+        model=Stream51ModelConfig(
+            **{key: value for key, value in model.items() if key != "tick_counts"},
+            tick_counts=tuple(model["tick_counts"]),
+        ),
+        training=Stream51TrainingConfig(**training),
+        evaluation=Stream51EvaluationConfig(**evaluation),
+    )
+    validate_stream51_config(config)
     return config
 
 
@@ -613,3 +724,63 @@ def validate_adding_problem_config(config: AddingProblemConfig) -> None:
         raise ValueError("inspection_length must be an evaluation length")
     if evaluation.inspection_examples <= 0:
         raise ValueError("inspection_examples must be positive")
+
+
+def validate_stream51_config(config: Stream51Config) -> None:
+    experiment = config.experiment
+    data = config.data
+    model = config.model
+    training = config.training
+    evaluation = config.evaluation
+
+    if experiment.kind != "stream51_temporal_state":
+        raise ValueError("experiment.kind must be stream51_temporal_state")
+    if experiment.device not in {"auto", "cpu", "cuda", "mps"}:
+        raise ValueError("experiment.device must be auto, cpu, cuda, or mps")
+    if not experiment.seeds or len(set(experiment.seeds)) != len(experiment.seeds):
+        raise ValueError("experiment.seeds must contain unique values")
+    if any(seed < 0 for seed in experiment.seeds):
+        raise ValueError("experiment.seeds must be non-negative")
+
+    expected_orderings = ("natural", "local_shuffle", "global_shuffle")
+    if data.orderings != expected_orderings:
+        raise ValueError(f"data.orderings must be exactly {expected_orderings}")
+    if data.order_seed < 0:
+        raise ValueError("data.order_seed must be non-negative")
+    if data.bbox_padding_ratio < 1.0:
+        raise ValueError("data.bbox_padding_ratio must be at least 1.0")
+    if data.feature_batch_size <= 0 or data.num_workers < 0:
+        raise ValueError("Feature batch size must be positive and workers non-negative")
+    if data.max_trajectories is not None and data.max_trajectories <= 0:
+        raise ValueError("data.max_trajectories must be positive or null")
+
+    if model.encoder_weights != "IMAGENET1K_V1":
+        raise ValueError("model.encoder_weights must be IMAGENET1K_V1")
+    if model.feature_size != 512:
+        raise ValueError("ResNet-18 requires model.feature_size=512")
+    if model.hidden_size <= 0 or model.num_classes != 51:
+        raise ValueError("Stream-51 requires positive hidden_size and num_classes=51")
+    if model.tick_counts != (1, 4):
+        raise ValueError("model.tick_counts must be exactly [1, 4]")
+
+    if training.passes != 1 or training.batch_size != 1:
+        raise ValueError("Stream-51 requires one pass with batch_size=1")
+    if training.optimizer != "adamw":
+        raise ValueError("Stream-51 requires training.optimizer='adamw'")
+    if training.learning_rate <= 0 or training.gradient_clip_norm <= 0:
+        raise ValueError("Learning rate and gradient clip norm must be positive")
+    if training.weight_decay < 0:
+        raise ValueError("training.weight_decay cannot be negative")
+
+    if evaluation.window_size <= 0 or evaluation.eval_batch_size <= 0:
+        raise ValueError("Evaluation window and batch sizes must be positive")
+    for name, value in (
+        ("min_natural_persistence_gain", evaluation.min_natural_persistence_gain),
+        ("min_natural_over_global_gain", evaluation.min_natural_over_global_gain),
+        ("max_heldout_macro_penalty", evaluation.max_heldout_macro_penalty),
+        ("min_multitick_interaction_gain", evaluation.min_multitick_interaction_gain),
+    ):
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"evaluation.{name} must be in [0, 1]")
+    if not 1 <= evaluation.min_paired_seed_wins <= len(experiment.seeds):
+        raise ValueError("evaluation.min_paired_seed_wins must fit experiment.seeds")

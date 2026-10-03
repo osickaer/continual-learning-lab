@@ -9,7 +9,7 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 import continual_learning_lab.experiment as experiment_module
-from continual_learning_lab.config import DelayedRecallConfig, load_config
+from continual_learning_lab.config import DelayedRecallConfig, Stream51Config, load_config
 from continual_learning_lab.data import JointLoaders, TaskLoaders
 from continual_learning_lab.evaluation import EvaluationResult
 from continual_learning_lab.experiment import _build_run_report, _run_joint, _run_sequential
@@ -20,6 +20,9 @@ CONFIG_PATH = Path(__file__).parents[1] / "configs" / "naive_split_cifar10.yaml"
 JOINT_CONFIG_PATH = Path(__file__).parents[1] / "configs" / "joint_cifar10_oracle.yaml"
 DELAYED_CONFIG_PATH = (
     Path(__file__).parents[1] / "configs" / "heterogeneous_leaky_delayed_recall.yaml"
+)
+STREAM51_CONFIG_PATH = (
+    Path(__file__).parents[1] / "configs" / "stream51_temporal_state.yaml"
 )
 
 
@@ -280,3 +283,26 @@ def test_run_experiment_dispatches_delayed_recall_suite(monkeypatch, tmp_path: P
 
     assert result == expected_path
     assert calls == [(config, DELAYED_CONFIG_PATH, torch.device("cpu"))]
+
+
+def test_run_experiment_dispatches_stream51_suite(monkeypatch, tmp_path: Path) -> None:
+    import continual_learning_lab.stream51_experiment as stream51_module
+
+    config = load_config(STREAM51_CONFIG_PATH)
+    assert isinstance(config, Stream51Config)
+    expected_path = tmp_path / "stream51-suite"
+    calls: list[tuple[object, ...]] = []
+
+    def fake_run(received_config, received_path, device):
+        calls.append((received_config, received_path, device))
+        return expected_path
+
+    monkeypatch.setattr(stream51_module, "run_stream51_experiment", fake_run)
+    monkeypatch.setattr(
+        experiment_module, "resolve_device", lambda requested: torch.device("cpu")
+    )
+
+    result = experiment_module.run_experiment(config, STREAM51_CONFIG_PATH)
+
+    assert result == expected_path
+    assert calls == [(config, STREAM51_CONFIG_PATH, torch.device("cpu"))]

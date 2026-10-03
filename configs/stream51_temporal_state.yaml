@@ -1,0 +1,52 @@
+# Experiment 004 tests whether recurrent activation carried between observations
+# exploits the temporal coherence of Stream-51. The raw dataset must be placed
+# manually under data/stream51; frozen ResNet-18 features are cached on first run.
+experiment:
+  kind: stream51_temporal_state
+  name: experiment-004-stream51-temporal-state
+  run_name: exp004-stream51-state
+  seeds: [42, 43, 44]
+  device: auto
+  output_dir: outputs
+  tracking_uri: sqlite:///mlflow.db
+  artifact_dir: mlartifacts
+  deterministic: true
+
+data:
+  root: data/stream51
+  train_metadata: Stream-51_meta_train.json
+  test_metadata: Stream-51_meta_test.json
+  feature_cache: data/stream51/resnet18_imagenet1k_v1_features.pt
+  orderings: [natural, local_shuffle, global_shuffle]
+  order_seed: 42
+  bbox_crop: true
+  bbox_padding_ratio: 1.10
+  feature_batch_size: 128
+  num_workers: 0
+  pin_memory: true
+  # Null means every official trajectory. Set only in a non-official smoke config.
+  max_trajectories: null
+
+model:
+  encoder_weights: IMAGENET1K_V1
+  feature_size: 512
+  hidden_size: 256
+  num_classes: 51
+  tick_counts: [1, 4]
+
+training:
+  passes: 1
+  batch_size: 1
+  optimizer: adamw
+  learning_rate: 0.001
+  weight_decay: 0.0
+  gradient_clip_norm: 1.0
+
+evaluation:
+  window_size: 1000
+  eval_batch_size: 256
+  min_natural_persistence_gain: 0.02
+  min_natural_over_global_gain: 0.02
+  max_heldout_macro_penalty: 0.02
+  min_multitick_interaction_gain: 0.01
+  min_paired_seed_wins: 2

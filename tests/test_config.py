@@ -2,7 +2,12 @@ from pathlib import Path
 
 import pytest
 
-from continual_learning_lab.config import AddingProblemConfig, DelayedRecallConfig, load_config
+from continual_learning_lab.config import (
+    AddingProblemConfig,
+    DelayedRecallConfig,
+    Stream51Config,
+    load_config,
+)
 
 
 CONFIG_PATH = Path(__file__).parents[1] / "configs" / "naive_split_cifar10.yaml"
@@ -16,6 +21,9 @@ CORRECTED_DELAYED_CONFIG_PATH = (
     / "heterogeneous_leaky_delayed_recall_corrected.yaml"
 )
 ADDING_CONFIG_PATH = Path(__file__).parents[1] / "configs" / "adding_problem.yaml"
+STREAM51_CONFIG_PATH = (
+    Path(__file__).parents[1] / "configs" / "stream51_temporal_state.yaml"
+)
 
 
 def test_baseline_config_loads() -> None:
@@ -92,6 +100,18 @@ def test_adding_problem_config_separates_training_and_unseen_lengths() -> None:
     assert config.data.evaluation_lengths == (20, 40, 80, 160, 320)
     assert config.evaluation.long_lengths == (160, 320)
     assert config.model.output_size == 1
+
+
+def test_stream51_config_encodes_the_matched_reset_experiment_contract() -> None:
+    config = load_config(STREAM51_CONFIG_PATH)
+
+    assert isinstance(config, Stream51Config)
+    assert config.experiment.seeds == (42, 43, 44)
+    assert config.data.orderings == ("natural", "local_shuffle", "global_shuffle")
+    assert config.data.order_seed == 42
+    assert config.model.tick_counts == (1, 4)
+    assert config.training.passes == 1
+    assert config.training.batch_size == 1
 
 
 def test_delayed_recall_rejects_groups_that_do_not_fill_hidden_state(

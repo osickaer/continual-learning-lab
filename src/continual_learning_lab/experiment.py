@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import mlflow
@@ -11,6 +10,7 @@ from continual_learning_lab.config import (
     Config,
     DelayedRecallConfig,
     LoadedConfig,
+    Stream51Config,
 )
 from continual_learning_lab.data import (
     JointLoaders,
@@ -19,6 +19,7 @@ from continual_learning_lab.data import (
     build_split_cifar10,
 )
 from continual_learning_lab.evaluation import EvaluationResult, evaluate
+from continual_learning_lab.experiment_utils import write_json as _write_json
 from continual_learning_lab.learners.base import ContinualLearner
 from continual_learning_lab.learners.naive import NaiveSequentialLearner
 from continual_learning_lab.metrics import AccuracyMatrix
@@ -47,10 +48,6 @@ def build_learner(config: Config, device: torch.device) -> ContinualLearner:
     if config.training.method == "naive":
         return NaiveSequentialLearner(model, config.training, device)
     raise ValueError(f"Unsupported continual-learning method: {config.training.method}")
-
-
-def _write_json(path: Path, values: object) -> None:
-    path.write_text(json.dumps(values, indent=2), encoding="utf-8")
 
 
 def _run_sequential(
@@ -297,6 +294,13 @@ def _build_run_report(config: Config, summary: dict[str, object]) -> str:
 
 
 def run_experiment(config: LoadedConfig, config_path: str | Path) -> Path:
+    if isinstance(config, Stream51Config):
+        from continual_learning_lab.stream51_experiment import run_stream51_experiment
+
+        device = resolve_device(config.experiment.device)
+        print(f"Using device: {device}", flush=True)
+        return run_stream51_experiment(config, config_path, device)
+
     if isinstance(config, AddingProblemConfig):
         from continual_learning_lab.adding_problem_experiment import (
             run_adding_problem_experiment,

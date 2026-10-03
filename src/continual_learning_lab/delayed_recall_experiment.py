@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import csv
-import json
 import math
 import platform
 import statistics
@@ -24,6 +23,10 @@ from continual_learning_lab.config import DelayedRecallConfig
 from continual_learning_lab.delayed_recall_data import (
     DelayedRecallLoaders,
     build_delayed_recall_loaders,
+)
+from continual_learning_lab.experiment_utils import (
+    synchronize_device as _synchronize_device,
+    write_json as _write_json,
 )
 from continual_learning_lab.model import count_trainable_parameters
 from continual_learning_lab.recurrent_models import build_recurrent_model
@@ -53,17 +56,6 @@ class RecallRunResult:
     validation: dict[int, RecallMetrics]
     test: dict[int, RecallMetrics]
     model_state_path: Path
-
-
-def _write_json(path: Path, values: object) -> None:
-    path.write_text(json.dumps(values, indent=2), encoding="utf-8")
-
-
-def _synchronize_device(device: torch.device) -> None:
-    if device.type == "cuda":
-        torch.cuda.synchronize(device)
-    elif device.type == "mps":
-        torch.mps.synchronize()
 
 
 @torch.no_grad()
